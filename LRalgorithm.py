@@ -1,6 +1,7 @@
 """
 @author: Vladan Kudlac
 """
+from collections import defaultdict
 from typing import Tuple, List, Dict
 from ConflictPair import ConflictPair
 import numpy
@@ -21,8 +22,9 @@ class LRPlanarityCheck:
 
 	s: List[ConflictPair]
 	stack_bottom: Dict[Tuple[int, int], ConflictPair]
-	ref: Dict[Tuple[int, int], Tuple[int, int]]
 	lowpt_edge: Dict[Tuple[int, int], Tuple[int, int]]
+	ref: defaultdict  # Dict[Tuple[int, int], Tuple[int, int]]
+	side: defaultdict  # Dict[Tuple[int, int], int]
 
 	def __init__(self, graph: numpy.array):
 		# Used in both DFS traversals
@@ -41,8 +43,9 @@ class LRPlanarityCheck:
 		# Used in second DFS traversal
 		self.s = []
 		self.stack_bottom = {}
-		self.ref = {}
 		self.lowpt_edge = {}
+		self.ref = defaultdict(lambda: None)
+		self.side = defaultdict(lambda: 1)
 
 	def simple_check(self) -> bool:
 		"""
@@ -55,7 +58,7 @@ class LRPlanarityCheck:
 		v = self.graph[0].size
 		e = self.graph.sum() / 2
 
-		return e <= (3 * v - 6)
+		return v < 3 or e <= (3 * v - 6)
 
 	def run(self) -> bool:
 		"""
@@ -144,7 +147,7 @@ class LRPlanarityCheck:
 				self.lowpt_edge[ei] = ei
 				self.s.append(ConflictPair(right=[ei, ei]))
 			if self.lowpt[ei] < self.height[v]:  # ei has return edge
-				if ei == self.adj_list[v][0]:
+				if w == self.adj_list[v][0]:
 					self.lowpt_edge[e] = self.lowpt_edge[ei]
 				else:
 					# Add constraints of ei
@@ -159,7 +162,7 @@ class LRPlanarityCheck:
 			if self.lowpt[e] < self.height[u]:  # e has return edge
 				hl = self.top_s().l[1]
 				hr = self.top_s().r[1]
-				if hl is not None and (hr is not None or self.lowpt[hl] > self.lowpt[hr]):
+				if hl is not None and (hr is None or self.lowpt[hl] > self.lowpt[hr]):
 					self.ref[e] = hl
 				else:
 					self.ref[e] = hr
@@ -168,7 +171,7 @@ class LRPlanarityCheck:
 
 	def add_constraints(self, ei: Tuple[int, int], e: Tuple[int, int]) -> bool:
 		"""
-		Add constraints of ei
+		Add constraints of ei (phase 2)
 		@param e: Tuple[int, int]
 		@param ei: Tuple[int, int]
 		@return: bool False when not planar, True when it still can be planar
@@ -177,9 +180,9 @@ class LRPlanarityCheck:
 		# merge return edges of ei into p.r
 		while True:
 			q = self.s.pop()
-			if q.l is not None:
+			if not (q.l[0] is None and q.l[1] is None):
 				q.swap()
-			if q.l is not None:
+			if not (q.l[0] is None and q.l[1] is None):
 				return False  # HALT: not planar
 			else:
 				if self.lowpt[q.r[0]] > self.lowpt[e]:  # merge intervals
@@ -216,7 +219,35 @@ class LRPlanarityCheck:
 		return True
 
 	def trim_back_edges(self, u: int):
-		pass
+		"""
+		Remove back edges ending at parent u (phase 2)
+		@param u:
+		@return:
+		"""
+		# drop entire conflict pairs
+		while len(self.s) and self.lowest(self.top_s()) == self.height[u]:
+			p = self.s.pop()
+			if p.l[0] is not None:
+				self.side[p.l[0]] = -1
+
+		# one more conflict pair to consider
+		if len(self.s):
+			p = self.s.pop()
+			# trim left interval
+			while p.l[1] is not None and p.l[1][1] == u:
+				p.l[1] = self.ref[p.l[1]]
+			if p.l[1] is None and p.l[0] is not None:  # just emptied
+				self.ref[p.l[0]] = p.r[0]
+				self.side[p.l[0]] = -1
+				p.l = (None, p.l[1])
+			# trim right interval
+			while p.r[1] is not None and p.r[1][1] == u:
+				p.r[1] = self.ref[p.r[1]]
+			if p.r[1] is None and p.r[0] is not None:  # just emptied
+				self.ref[p.r[0]] = p.l[0]
+				self.side[p.r[0]] = -1
+				p.r = (None, p.r[1])
+			self.s.append(p)
 
 	def conflicting(self, i: List[Tuple[int, int]], b: Tuple[int, int]) -> bool:
 		"""
@@ -225,24 +256,88 @@ class LRPlanarityCheck:
 		@param b: Tuple[int, int] edge
 		@return: bool True when conflicting, otherwise False
 		"""
-		return i is not None and self.lowpt[i[1]] > self.lowpt[b]
+		return not (i[0] is None and i[1] is None) and self.lowpt[i[1]] > self.lowpt[b]
 
 	def top_s(self) -> ConflictPair:
 		"""
 		Return last item on stack or None when empty
 		@return: ConflictPair | None
 		"""
-		return self.s[-1] if len(self.s) != 0 else None
+		return self.s[-1] if len(self.s) else None
+
+	def lowest(self, p: ConflictPair) -> int:
+		if p.l[0] is None and p.l[1] is None:
+			return self.lowpt[p.r[0]]
+		if p.r[0] is None and p.r[1] is None:
+			return self.lowpt[p.l[0]]
+		return min(self.lowpt[p.r[0]], self.lowpt[p.l[0]])
 
 
 if __name__ == '__main__':
-	graph = numpy.empty((10, 10))
-	graph.fill(0)
-	graph[0][5] = 1
-	graph[5][6] = 1
-	graph[6][0] = 1
-	graph[6][7] = 1
-	graph[7][5] = 1
+
+	print("K3 Triangle (planar)")
+	graph = numpy.empty((3, 3))
+	graph.fill(1)
+	graph -= numpy.diag(graph.diagonal())
 	lrTest = LRPlanarityCheck(graph)
 	print("Simple check: ", lrTest.simple_check())
 	print("LR test: ", lrTest.run())
+	print(graph)
+
+	print("Graph by Dylan Emery (planar)")
+	graph = numpy.empty((9, 9))
+	graph.fill(0)
+	graph[0][1] = 1
+	graph[0][3] = 1
+	graph[0][8] = 1
+	graph[2][1] = 1
+	graph[2][3] = 1
+	graph[2][5] = 1
+	graph[4][3] = 1
+	graph[4][5] = 1
+	graph[4][8] = 1
+	graph[6][1] = 1
+	graph[6][5] = 1
+	graph[7][5] = 1
+	graph[7][8] = 1
+	graph += graph.T - numpy.diag(graph.diagonal())
+	lrTest = LRPlanarityCheck(graph)
+	print("Simple check: ", lrTest.simple_check())
+	print("LR test: ", lrTest.run())
+	print(graph)
+
+	print("\nK3,3 (not planar)")
+	graph = numpy.empty((6, 6))
+	graph.fill(0)
+	graph[0][3] = 1
+	graph[0][4] = 1
+	graph[0][5] = 1
+	graph[1][3] = 1
+	graph[1][4] = 1
+	graph[1][5] = 1
+	graph[2][3] = 1
+	graph[2][4] = 1
+	graph[2][5] = 1
+	graph += graph.T - numpy.diag(graph.diagonal())
+	lrTest = LRPlanarityCheck(graph)
+	print("Simple check: ", lrTest.simple_check())
+	print("LR test: ", lrTest.run())
+	print(graph)
+
+	print("\nK5 (not planar)")
+	graph = numpy.empty((5, 5))
+	graph.fill(1)
+	graph -= numpy.diag(graph.diagonal())
+	lrTest = LRPlanarityCheck(graph)
+	print("Simple check: ", lrTest.simple_check())
+	print("LR test: ", lrTest.run())
+	print(graph)
+
+	print("\nK6 (not planar)")
+	graph = numpy.empty((6, 6))
+	graph.fill(1)
+	graph -= numpy.diag(graph.diagonal())
+	lrTest = LRPlanarityCheck(graph)
+	print("Simple check: ", lrTest.simple_check())
+	print("LR test: ", lrTest.run())
+	print(graph)
