@@ -1,13 +1,31 @@
 """
 @author: Vladan Kudlac
 """
+from typing import Tuple, List, Dict
 from ConflictPair import ConflictPair
 import numpy
 
 
 class LRPlanarityCheck:
 
+	parent_edge: List[Tuple[int, int]]
+	height: List[int]
+	orientedGraph: List[Tuple[int, int]]
+	lowpt: Dict[Tuple[int, int], int]
+	nesting_depth: Dict[Tuple[int, int], int]
+
+	adj_list: List[List[int]]
+
+	graph: numpy.array
+	lowpt2: Dict[Tuple[int, int], int]
+
+	s: List[ConflictPair]
+	stack_bottom: Dict[Tuple[int, int], ConflictPair]
+	ref: Dict[Tuple[int, int], Tuple[int, int]]
+	lowpt_edge: Dict[Tuple[int, int], Tuple[int, int]]
+
 	def __init__(self, graph: numpy.array):
+		# Used in both DFS traversals
 		self.parent_edge = [None] * graph[0].size
 		self.height = [None] * graph[0].size
 		self.orientedGraph = []
@@ -22,11 +40,15 @@ class LRPlanarityCheck:
 
 		# Used in second DFS traversal
 		self.s = []
-		self.stack_bottom = []
+		self.stack_bottom = {}
 		self.ref = {}
 		self.lowpt_edge = {}
 
 	def simple_check(self) -> bool:
+		"""
+		Euler's Relation planarity check
+		@return: bool False when not planar, True when it still can be planar
+		"""
 		if self.graph.size == 0:
 			return True
 
@@ -38,6 +60,7 @@ class LRPlanarityCheck:
 	def run(self) -> bool:
 		"""
 		Left-Right planarity algorithm
+		@return: bool False when not planar, True when planar
 		"""
 		if self.graph.size == 0:
 			return True
@@ -66,9 +89,10 @@ class LRPlanarityCheck:
 
 		return True
 
-	def lr_orientation(self, v: int):
+	def lr_orientation(self, v: int) -> None:
 		"""
 		Phase 1 - DFS orientation and nesting order
+		@param v: int vertex
 		"""
 		e = self.parent_edge[v]
 		for w in range(self.graph[v].size):
@@ -103,14 +127,16 @@ class LRPlanarityCheck:
 					else:
 						self.lowpt2[e] = min(self.lowpt2[e], self.lowpt2[(v, w)])
 
-	def lr_test(self, v: int):
+	def lr_test(self, v: int) -> bool:
 		"""
 		Phase 2 - Testing for LR partition
+		@param v: int vertex
+		@return: bool False when not planar, True when it still can be planar
 		"""
 		e = self.parent_edge[v]
 		for w in self.adj_list[v]:
 			ei = (v, w)
-			self.stack_bottom = top(self.s)
+			self.stack_bottom[ei] = self.top_s()
 			if ei == self.parent_edge[w]:  # tree edge
 				if not self.lr_test(w):
 					return False
@@ -122,7 +148,7 @@ class LRPlanarityCheck:
 					self.lowpt_edge[e] = self.lowpt_edge[ei]
 				else:
 					# Add constraints of ei
-					if not self.add_constraints(ei):
+					if not self.add_constraints(ei, e):
 						return False
 
 		if e is not None:  # v is not root
@@ -131,27 +157,82 @@ class LRPlanarityCheck:
 			self.trim_back_edges(u)
 			# Side of e is side of a highest return edge
 			if self.lowpt[e] < self.height[u]:  # e has return edge
-				hl = top(self.s).l[1]
-				hr = top(self.s).r[1]
+				hl = self.top_s().l[1]
+				hr = self.top_s().r[1]
 				if hl is not None and (hr is not None or self.lowpt[hl] > self.lowpt[hr]):
 					self.ref[e] = hl
 				else:
 					self.ref[e] = hr
 
-	def add_constraints(self, ei: tuple) -> bool:
+		return True
+
+	def add_constraints(self, ei: Tuple[int, int], e: Tuple[int, int]) -> bool:
+		"""
+		Add constraints of ei
+		@param e: Tuple[int, int]
+		@param ei: Tuple[int, int]
+		@return: bool False when not planar, True when it still can be planar
+		"""
+		p = ConflictPair()
+		# merge return edges of ei into p.r
+		while True:
+			q = self.s.pop()
+			if q.l is not None:
+				q.swap()
+			if q.l is not None:
+				return False  # HALT: not planar
+			else:
+				if self.lowpt[q.r[0]] > self.lowpt[e]:  # merge intervals
+					if p.r[0] is None and p.r[1] is None:
+						p.r[1] = q.r[1]
+					else:
+						self.ref[p.r[0]] = q.r[1]
+					p.r[0] = q.r[0]
+				else:  # make consistent
+					self.ref[q.r[0]] = self.lowpt_edge[e]
+			if self.top_s() == self.stack_bottom[ei]:
+				break
+
+		# merge conflicting return edges of e(1), ... , e(i-1) into p.l
+		while self.conflicting(self.top_s().l, ei) or self.conflicting(self.top_s().r, ei):
+			q = self.s.pop()
+			if self.conflicting(q.r, ei):
+				q.swap()
+			if self.conflicting(q.r, ei):
+				return False  # HALT: not planar
+			else:  # merge interval below lowpt[ei] into p.r
+				self.ref[p.r[0]] = q.r[1]
+				if q.r[0] is not None:
+					p.r[0] = q.r[0]
+			if p.l[0] is None and p.l[1] is None:
+				p.l[1] = q.l[1]
+			else:
+				self.ref[p.l[0]] = q.l[1]
+			p.l[0] = q.l[0]
+
+		if not (p.l[0] is None and p.l[1] is None and p.r[0] is None and p.r[1] is None):
+			self.s.append(p)
+
 		return True
 
 	def trim_back_edges(self, u: int):
 		pass
 
+	def conflicting(self, i: List[Tuple[int, int]], b: Tuple[int, int]) -> bool:
+		"""
+		Check conflicting edge against interval
+		@param i: List[Tuple[int, int]] interval
+		@param b: Tuple[int, int] edge
+		@return: bool True when conflicting, otherwise False
+		"""
+		return i is not None and self.lowpt[i[1]] > self.lowpt[b]
 
-def top(stack):
-	"""
-	Return last item on stack or null when empty
-	@param stack: List
-	@return:
-	"""
-	return stack[-1] if len(stack) != 0 else None
+	def top_s(self) -> ConflictPair:
+		"""
+		Return last item on stack or None when empty
+		@return: ConflictPair | None
+		"""
+		return self.s[-1] if len(self.s) != 0 else None
 
 
 if __name__ == '__main__':
