@@ -284,7 +284,16 @@ if __name__ == '__main__':
 	print("LR test: ", lrTest.run())
 	print(graph)
 
-	print("Graph by Dylan Emery (planar)")
+	print("\nK4 (planar)")
+	graph = numpy.empty((4, 4))
+	graph.fill(1)
+	graph -= numpy.diag(graph.diagonal())
+	lrTest = LRPlanarityCheck(graph)
+	print("Simple check: ", lrTest.simple_check())
+	print("LR test: ", lrTest.run())
+	print(graph)
+
+	print("\nGraph by Dylan Emery (planar)")
 	graph = numpy.empty((9, 9))
 	graph.fill(0)
 	graph[0][1] = 1
