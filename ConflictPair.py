@@ -1,19 +1,19 @@
 """
 @author: Vladan Kudlac
 """
-from typing import Tuple, List
+from Interval import Interval
 
 
 class ConflictPair:
 
-	l: List[Tuple[int, int]]
-	r: List[Tuple[int, int]]
+	l: Interval
+	r: Interval
 
-	def __init__(self, left: List[Tuple[int, int]] = None, right: List[Tuple[int, int]] = None):
+	def __init__(self, left: Interval = None, right: Interval = None):
 		if left is None:
-			left = [None, None]
+			left = Interval()
 		if right is None:
-			right = [None, None]
+			right = Interval()
 		self.l = left
 		self.r = right
 

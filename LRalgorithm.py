@@ -1,10 +1,14 @@
 """
 @author: Vladan Kudlac
+@see: http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.217.9208
 """
 from collections import defaultdict
 from typing import Tuple, List, Dict
 from ConflictPair import ConflictPair
+from BucketSearch import bucket_sort
 import numpy
+
+from Interval import Interval
 
 
 class LRPlanarityCheck:
@@ -78,7 +82,7 @@ class LRPlanarityCheck:
 				self.lr_orientation(s)
 			# sort adjacency list according to non-decreasing nesting_depth O(n * log n)
 			if self.adj_list[s] is not None:
-				self.adj_list[s] = sorted(self.adj_list[s], key=lambda x: self.nesting_depth[(s, x)])
+				self.adj_list[s] = bucket_sort(self.adj_list[s], s, self.nesting_depth, len(self.adj_list)*2)
 			else:
 				self.adj_list[s] = []
 
@@ -145,7 +149,7 @@ class LRPlanarityCheck:
 					return False
 			else:  # back edge
 				self.lowpt_edge[ei] = ei
-				self.s.append(ConflictPair(right=[ei, ei]))
+				self.s.append(ConflictPair(right=Interval(ei, ei)))
 			if self.lowpt[ei] < self.height[v]:  # ei has return edge
 				if w == self.adj_list[v][0]:
 					self.lowpt_edge[e] = self.lowpt_edge[ei]
@@ -160,8 +164,8 @@ class LRPlanarityCheck:
 			self.trim_back_edges(u)
 			# Side of e is side of a highest return edge
 			if self.lowpt[e] < self.height[u]:  # e has return edge
-				hl = self.top_s().l[1]
-				hr = self.top_s().r[1]
+				hl = self.top_s().l.high
+				hr = self.top_s().r.high
 				if hl is not None and (hr is None or self.lowpt[hl] > self.lowpt[hr]):
 					self.ref[e] = hl
 				else:
@@ -180,19 +184,19 @@ class LRPlanarityCheck:
 		# merge return edges of ei into p.r
 		while True:
 			q = self.s.pop()
-			if not (q.l[0] is None and q.l[1] is None):
+			if not (q.l.empty()):
 				q.swap()
-			if not (q.l[0] is None and q.l[1] is None):
+			if not (q.l.empty()):
 				return False  # HALT: not planar
 			else:
-				if self.lowpt[q.r[0]] > self.lowpt[e]:  # merge intervals
-					if p.r[0] is None and p.r[1] is None:
-						p.r[1] = q.r[1]
+				if self.lowpt[q.r.low] > self.lowpt[e]:  # merge intervals
+					if p.r.empty():
+						p.r.high = q.r.high
 					else:
-						self.ref[p.r[0]] = q.r[1]
-					p.r[0] = q.r[0]
+						self.ref[p.r.low] = q.r.high
+					p.r.low = q.r.low
 				else:  # make consistent
-					self.ref[q.r[0]] = self.lowpt_edge[e]
+					self.ref[q.r.low] = self.lowpt_edge[e]
 			if self.top_s() == self.stack_bottom[ei]:
 				break
 
@@ -204,16 +208,16 @@ class LRPlanarityCheck:
 			if self.conflicting(q.r, ei):
 				return False  # HALT: not planar
 			else:  # merge interval below lowpt[ei] into p.r
-				self.ref[p.r[0]] = q.r[1]
-				if q.r[0] is not None:
-					p.r[0] = q.r[0]
-			if p.l[0] is None and p.l[1] is None:
-				p.l[1] = q.l[1]
+				self.ref[p.r.low] = q.r.high
+				if q.r.low is not None:
+					p.r.low = q.r.low
+			if p.l.empty():
+				p.l.high = q.l.high
 			else:
-				self.ref[p.l[0]] = q.l[1]
-			p.l[0] = q.l[0]
+				self.ref[p.l.low] = q.l.high
+			p.l.low = q.l.low
 
-		if not (p.l[0] is None and p.l[1] is None and p.r[0] is None and p.r[1] is None):
+		if not (p.l.empty() and p.r.empty()):
 			self.s.append(p)
 
 		return True
@@ -227,36 +231,36 @@ class LRPlanarityCheck:
 		# drop entire conflict pairs
 		while len(self.s) and self.lowest(self.top_s()) == self.height[u]:
 			p = self.s.pop()
-			if p.l[0] is not None:
-				self.side[p.l[0]] = -1
+			if p.l.low is not None:
+				self.side[p.l.low] = -1
 
 		# one more conflict pair to consider
 		if len(self.s):
 			p = self.s.pop()
 			# trim left interval
-			while p.l[1] is not None and p.l[1][1] == u:
-				p.l[1] = self.ref[p.l[1]]
-			if p.l[1] is None and p.l[0] is not None:  # just emptied
-				self.ref[p.l[0]] = p.r[0]
-				self.side[p.l[0]] = -1
-				p.l = (None, p.l[1])
+			while p.l.high is not None and p.l.high[1] == u:
+				p.l.high = self.ref[p.l.high]
+			if p.l.high is None and p.l.low is not None:  # just emptied
+				self.ref[p.l.low] = p.r.low
+				self.side[p.l.low] = -1
+				p.l = Interval(high=p.l.high)
 			# trim right interval
-			while p.r[1] is not None and p.r[1][1] == u:
-				p.r[1] = self.ref[p.r[1]]
-			if p.r[1] is None and p.r[0] is not None:  # just emptied
-				self.ref[p.r[0]] = p.l[0]
-				self.side[p.r[0]] = -1
-				p.r = (None, p.r[1])
+			while p.r.high is not None and p.r.high[1] == u:
+				p.r.high = self.ref[p.r.high]
+			if p.r.high is None and p.r.low is not None:  # just emptied
+				self.ref[p.r.low] = p.l.low
+				self.side[p.r.low] = -1
+				p.r = Interval(high=p.r.high)
 			self.s.append(p)
 
-	def conflicting(self, i: List[Tuple[int, int]], b: Tuple[int, int]) -> bool:
+	def conflicting(self, i: Interval, b: Tuple[int, int]) -> bool:
 		"""
 		Check conflicting edge against interval
-		@param i: List[Tuple[int, int]] interval
+		@param i: Interval interval
 		@param b: Tuple[int, int] edge
 		@return: bool True when conflicting, otherwise False
 		"""
-		return not (i[0] is None and i[1] is None) and self.lowpt[i[1]] > self.lowpt[b]
+		return not (i.empty()) and self.lowpt[i.high] > self.lowpt[b]
 
 	def top_s(self) -> ConflictPair:
 		"""
@@ -266,11 +270,11 @@ class LRPlanarityCheck:
 		return self.s[-1] if len(self.s) else None
 
 	def lowest(self, p: ConflictPair) -> int:
-		if p.l[0] is None and p.l[1] is None:
-			return self.lowpt[p.r[0]]
-		if p.r[0] is None and p.r[1] is None:
-			return self.lowpt[p.l[0]]
-		return min(self.lowpt[p.r[0]], self.lowpt[p.l[0]])
+		if p.l.empty():
+			return self.lowpt[p.r.low]
+		if p.r.empty():
+			return self.lowpt[p.l.low]
+		return min(self.lowpt[p.r.low], self.lowpt[p.l.low])
 
 
 if __name__ == '__main__':
