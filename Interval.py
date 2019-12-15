@@ -6,10 +6,10 @@ from typing import Tuple
 
 class Interval:
 
-	low: Tuple[int, int]
-	high: Tuple[int, int]
+	low: Tuple[str, str]
+	high: Tuple[str, str]
 
-	def __init__(self, low: Tuple[int, int] = None, high: Tuple[int, int] = None):
+	def __init__(self, low: Tuple[str, str] = None, high: Tuple[str, str] = None):
 		self.low = low
 		self.high = high
 

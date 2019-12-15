@@ -5,7 +5,7 @@
 from typing import List, Dict, Tuple
 
 
-def bucket_sort(adj: List[int], v: int, nesting_depth: Dict[Tuple[int, int], int], size: int) -> List[int]:
+def bucket_sort(adj: List[str], v: str, nesting_depth: Dict[Tuple[str, str], int], size: int) -> List[str]:
 	# Create size empty buckets
 	buckets = []
 	for i in range(size):

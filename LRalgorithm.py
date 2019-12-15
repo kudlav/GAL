@@ -6,39 +6,42 @@ from collections import defaultdict
 from typing import Tuple, List, Dict
 from ConflictPair import ConflictPair
 from BucketSearch import bucket_sort
-import numpy
+from graph import Graph
+from graphs import *
+import datetime
 
 from Interval import Interval
 
 
 class LRPlanarityCheck:
 
-	parent_edge: List[Tuple[int, int]]
-	height: List[int]
-	orientedGraph: List[Tuple[int, int]]
-	lowpt: Dict[Tuple[int, int], int]
-	nesting_depth: Dict[Tuple[int, int], int]
+	parent_edge: defaultdict  # Dict[str, Tuple[str, str]]
+	height: defaultdict  # Dict[str, int]
+	orientedGraph: List[Tuple[str, str]]
+	lowpt: Dict[Tuple[str, str], int]
+	nesting_depth: Dict[Tuple[str, str], int]
 
-	adj_list: List[List[int]]
+	adj_list: defaultdict  # Dict[str, [List[str]]
 
-	graph: numpy.array
-	lowpt2: Dict[Tuple[int, int], int]
+	graph: Graph
+	lowpt2: Dict[Tuple[str, str], int]
 
 	s: List[ConflictPair]
-	stack_bottom: Dict[Tuple[int, int], ConflictPair]
-	lowpt_edge: Dict[Tuple[int, int], Tuple[int, int]]
-	ref: defaultdict  # Dict[Tuple[int, int], Tuple[int, int]]
-	side: defaultdict  # Dict[Tuple[int, int], int]
+	stack_bottom: Dict[Tuple[str, str], ConflictPair]
+	lowpt_edge: Dict[Tuple[str, str], Tuple[str, str]]
+	ref: defaultdict  # Dict[Tuple[str, str], Tuple[str, str]]
+	side: defaultdict  # Dict[Tuple[str, str], int]
 
-	def __init__(self, graph: numpy.array):
+	def __init__(self, graph: Graph):
+		v = len(graph.get_vertices())
 		# Used in both DFS traversals
-		self.parent_edge = [None] * graph[0].size
-		self.height = [None] * graph[0].size
+		self.parent_edge = defaultdict(lambda: None)
+		self.height = defaultdict(lambda: None)
 		self.orientedGraph = []
 		self.lowpt = {}
 		self.nesting_depth = {}
 
-		self.adj_list = [None] * graph[0].size
+		self.adj_list = defaultdict(lambda: None)
 
 		# Used in first DFS orientation, removed after that
 		self.graph = graph
@@ -56,11 +59,8 @@ class LRPlanarityCheck:
 		Euler's Relation planarity check
 		@return: bool False when not planar, True when it still can be planar
 		"""
-		if self.graph.size == 0:
-			return True
-
-		v = self.graph[0].size
-		e = self.graph.sum() / 2
+		v = len(self.graph.get_vertices())
+		e = len(self.graph.get_edges())
 
 		return v < 3 or e <= (3 * v - 6)
 
@@ -69,13 +69,11 @@ class LRPlanarityCheck:
 		Left-Right planarity algorithm
 		@return: bool False when not planar, True when planar
 		"""
-		if self.graph.size == 0:
-			return True
 
 		roots = []
 
 		# Orientation
-		for s in range(self.graph[0].size):
+		for s in self.graph.get_vertices():
 			if self.height[s] is None:
 				self.height[s] = 0
 				roots.append(s)
@@ -96,14 +94,14 @@ class LRPlanarityCheck:
 
 		return True
 
-	def lr_orientation(self, v: int) -> None:
+	def lr_orientation(self, v: str) -> None:
 		"""
 		Phase 1 - DFS orientation and nesting order
-		@param v: int vertex
+		@param v: str vertex
 		"""
 		e = self.parent_edge[v]
-		for w in range(self.graph[v].size):
-			if self.graph[v][w] == 1 and not ((v, w) in self.orientedGraph or (w, v) in self.orientedGraph):
+		for w in self.graph.get_Adj(v):
+			if not ((v, w) in self.orientedGraph or (w, v) in self.orientedGraph):
 				if self.adj_list[v] is None:
 					self.adj_list[v] = [w]
 				else:
@@ -134,10 +132,10 @@ class LRPlanarityCheck:
 					else:
 						self.lowpt2[e] = min(self.lowpt2[e], self.lowpt2[(v, w)])
 
-	def lr_test(self, v: int) -> bool:
+	def lr_test(self, v: str) -> bool:
 		"""
 		Phase 2 - Testing for LR partition
-		@param v: int vertex
+		@param v: str vertex
 		@return: bool False when not planar, True when it still can be planar
 		"""
 		e = self.parent_edge[v]
@@ -173,11 +171,11 @@ class LRPlanarityCheck:
 
 		return True
 
-	def add_constraints(self, ei: Tuple[int, int], e: Tuple[int, int]) -> bool:
+	def add_constraints(self, ei: Tuple[str, str], e: Tuple[str, str]) -> bool:
 		"""
 		Add constraints of ei (phase 2)
-		@param e: Tuple[int, int]
-		@param ei: Tuple[int, int]
+		@param e: Tuple[str, str]
+		@param ei: Tuple[str, str]
 		@return: bool False when not planar, True when it still can be planar
 		"""
 		p = ConflictPair()
@@ -222,7 +220,7 @@ class LRPlanarityCheck:
 
 		return True
 
-	def trim_back_edges(self, u: int):
+	def trim_back_edges(self, u: str):
 		"""
 		Remove back edges ending at parent u (phase 2)
 		@param u:
@@ -253,11 +251,11 @@ class LRPlanarityCheck:
 				p.r = Interval(high=p.r.high)
 			self.s.append(p)
 
-	def conflicting(self, i: Interval, b: Tuple[int, int]) -> bool:
+	def conflicting(self, i: Interval, b: Tuple[str, str]) -> bool:
 		"""
 		Check conflicting edge against interval
 		@param i: Interval interval
-		@param b: Tuple[int, int] edge
+		@param b: Tuple[str, str] edge
 		@return: bool True when conflicting, otherwise False
 		"""
 		return not (i.empty()) and self.lowpt[i.high] > self.lowpt[b]
@@ -278,25 +276,31 @@ class LRPlanarityCheck:
 
 
 if __name__ == '__main__':
-
-	print("K3 Triangle (planar)")
-	graph = numpy.empty((3, 3))
-	graph.fill(1)
-	graph -= numpy.diag(graph.diagonal())
+	graph = Graph(g_1)
 	lrTest = LRPlanarityCheck(graph)
 	print("Simple check: ", lrTest.simple_check())
-	print("LR test: ", lrTest.run())
-	print(graph)
-
-	print("\nK4 (planar)")
-	graph = numpy.empty((4, 4))
-	graph.fill(1)
-	graph -= numpy.diag(graph.diagonal())
+	print("LR test: ", lrTest.run(), "\n")
+	graph = Graph(g_2)
 	lrTest = LRPlanarityCheck(graph)
 	print("Simple check: ", lrTest.simple_check())
-	print("LR test: ", lrTest.run())
-	print(graph)
-
+	print("LR test: ", lrTest.run(), "\n")
+	graph = Graph(g_3)
+	lrTest = LRPlanarityCheck(graph)
+	print("Simple check: ", lrTest.simple_check())
+	print("LR test: ", lrTest.run(), "\n")
+	graph = Graph(g_4)
+	lrTest = LRPlanarityCheck(graph)
+	print("Simple check: ", lrTest.simple_check())
+	print("LR test: ", lrTest.run(), "\n")
+	graph = Graph(g_5)
+	lrTest = LRPlanarityCheck(graph)
+	print("Simple check: ", lrTest.simple_check())
+	print("LR test: ", lrTest.run(), "\n")
+	graph = Graph(g_6)
+	lrTest = LRPlanarityCheck(graph)
+	print("Simple check: ", lrTest.simple_check())
+	print("LR test: ", lrTest.run(), "\n")
+	'''
 	print("\nGraph by Dylan Emery (planar)")
 	graph = numpy.empty((9, 9))
 	graph.fill(0)
@@ -336,21 +340,22 @@ if __name__ == '__main__':
 	print("Simple check: ", lrTest.simple_check())
 	print("LR test: ", lrTest.run())
 	print(graph)
+	'''
 
-	print("\nK5 (not planar)")
-	graph = numpy.empty((5, 5))
-	graph.fill(1)
-	graph -= numpy.diag(graph.diagonal())
-	lrTest = LRPlanarityCheck(graph)
-	print("Simple check: ", lrTest.simple_check())
-	print("LR test: ", lrTest.run())
-	print(graph)
-
-	print("\nK6 (not planar)")
-	graph = numpy.empty((6, 6))
-	graph.fill(1)
-	graph -= numpy.diag(graph.diagonal())
-	lrTest = LRPlanarityCheck(graph)
-	print("Simple check: ", lrTest.simple_check())
-	print("LR test: ", lrTest.run())
-	print(graph)
+	alphabet = list('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789')
+	for k in range(1, len(alphabet)):
+		graph = {}
+		for i in range(k):
+			adj = []
+			for j in range(k):
+				if i != j:
+					adj.append(alphabet[j])
+			graph[alphabet[i]] = adj
+		print("K", k, ":")
+		lrTest = LRPlanarityCheck(Graph(graph))
+		print("Simple check: ", lrTest.simple_check())
+		start = datetime.datetime.now()
+		result = lrTest.run()
+		stop = datetime.datetime.now()
+		print("LR test: ", result)
+		print(stop-start, "\n")
