@@ -6,104 +6,113 @@ from operator import itemgetter
 import numpy as np
 
 from graph import Graph, OrderedGraph
-from graphs import g_1, g_2, g_3, g_4, g_5, g_6
+from graphs import g_1, g_2, g_3, g_4, g_5, g_6, K_5, K_3_3
 
 def isPlanar(graph):
     def isSegmentPlanar(vertexS, vertexT):
-            V_count = len(graph.get_vertices())
-            E_count = len(graph.get_edges())
+        aLefts =      []
+        aRights =     []
+        result =      []
+        A =           []
+        actAdjacent = []
+        aMaxL =       []
+        aMaxR =       []
+        spine =       []
 
-            if V_count < 5:
-                return True
+        source = vertexT
 
-            return True
-        aLefts = [] #LinkedList<LinkedList<Integer>>
-        aRights = [] #LinkedList<LinkedList<Integer>>
-
-        result = [] #LinkedList<Integer>
-        A = [] #LinkedList<Integer>
-        if V_count < 5:
-            return True
-
-        actAdjacent = [] #LinkedList<Integer>
-        aMaxL = [] #LinkedList<Integer>
-        aMaxR = [] #LinkedList<Integer>
-        spine = [] #LinkedList<Integer>
-
-        source = vertexT;
-
-        target = vertexT.getAdjacent()[0];
+        target = new_graph.get_Adj(vertexT)[0]
         if vertexT > vertexS:
-            spine.addLast(vertexT)
+            spine.append(vertexT)
             while target > source:
-                spine.addLast(target)
+                spine.append(target)
                 source = target
-                target = this.vertexProperties.get(target).getAdjacent().getFirst()
-            result.add(target)
+                target = new_graph.get_Adj(target)[0]
+            result.append(target)
         else:
-            result.add(vertexT)
+            result.append(vertexT)
 
-        while not spine.isEmpty():
-            source = spine.removeLast()
+        while spine != []:
+            source = spine[-1]
+            del spine[-1]
 
-            actAdjacent = this.vertexProperties.get(source).getAdjacent()
-            for i in range(1, actAdjacent.size()):
-                target = actAdjacent.get(i)
+            actAdjacent = new_graph.get_Adj(source)
+            for i in range(1, len(actAdjacent)):
+                target = actAdjacent[i]
 
-                A = isSegmentStronglyPlanar(source, target)
-                if A == None:
+                A = isSegmentPlanar(source, target)
+                if A == False:
                     return False
                 
                 if target < source:
                     aMin = target
                 else:
-                    aMin = this.vertexProperties.get(target).getLow()
+                    aMin = L1[order[target]]
 
                 if not bipartity_test(aMin, A, aLefts, aRights):
-                    return None
+                    return False
 
-            previous = vertexProperties.get(source).getParent()
+            if a[order[source]] == None:
+                previous = 0
+            else:
+                previous = D[a[order[source]]]
             stop = False
             while not stop:
-                if not aLefts.isEmpty() and previous >= 0:
-                    aMaxL = aLefts.removeLast()
-                    while not aMaxL.isEmpty() and aMaxL.peekLast() == previous:
-                        aMaxL.pollLast()
+                if not (aLefts == []) and previous >= 0:
+                    aMaxL = aLefts[-1]
+                    del aLefts[-1]
+                    while not (aMaxL == []):
+                        if aMaxL[-1] != previous:
+                            break
+                        if len(aMaxL) > 0:
+                            del aMaxL[-1]
 
-                    aMaxR = aRights.removeLast()
-                    while not aMaxR.isEmpty() and aMaxR.peekLast() == previous:
-                        aMaxR.pollLast();
+                    aMaxR = aRights[-1]
+                    del aRights[-1]
+                    while not (aMaxR == []):
+                        if aMaxR[-1] == previous:
+                            break
+                        if len(aMaxR) > 0:
+                            del aMaxR[-1]
 
-                    if not aMaxL.isEmpty() or not aMaxR.isEmpty():
-                        aLefts.addLast(aMaxL)
-                        aRights.addLast(aMaxR)
+                    if not (aMaxL == []) or not (aMaxR == []):
+                        aLefts.append(aMaxL)
+                        aRights.append(aMaxR)
                         stop = True
                 else:
                     stop = True
 
-        arb = [] # LinkedList<Integer>
-        alb = [] # LinkedList<Integer>
+        arb = []
+        alb = []
 
         w1 = vertexT
         previous = vertexS
-        while vertexProperties.get(vertexT).getLow() < previous:
+        while L1[order[vertexT]] < previous:
             w1 = previous
-            previous = vertexProperties.get(previous).getParent()
+            previous = D[a[order[previous]]]
 
-        while not aLefts.isEmpty():
-            arb = aRights.removeFirst()
-            alb = aLefts.removeFirst()
-            if not alb.isEmpty() and not arb.isEmpty() and alb.peekLast() >= w1 and arb.peekLast() >= w1:
-                return False
+        while not (aLefts == []):
+            arb = aRights[0]
+            del aRights[0]
 
-            if not alb.isEmpty() and alb.peekLast() >= w1:
-                result.addAll(arb)
-                result.addAll(alb)
+            alb = aLefts[0]
+            del aLefts[0]
+
+            if not (alb == []) and not (arb == []):
+                if alb[-1] >= w1 and arb[-1] >= w1:
+                    return False
+            if not (alb == []):
+                if alb[-1] >= w1:
+                    result = result + arb
+                    result = result + alb
+                else:
+                    result = result + alb
+                    result = result + arb
             else:
-                result.addAll(alb)
-                result.addAll(arb)
+                result = result + alb
+                result = result + arb
 
-        return True
+        return result
 
     graph.symetrize()
     graph.remove_self_loops()
@@ -114,8 +123,12 @@ def isPlanar(graph):
         V_count = len(graph.get_vertices())
         E_count = len(graph.get_edges())
 
-        if E_count > 3 * V_count - 6:
-            return False
+        if V_count > 2:
+            if E_count > 3 * V_count - 6:
+                return False
+        else:
+            return True
+
         _, _, _, ap, _, _ = DFS(component, lowpoints=False)
         bicomponents = get_biconnected_components(component, ap)
         for _, bicomponent in enumerate(bicomponents):
@@ -141,59 +154,90 @@ def isPlanar(graph):
                 for i, item in enumerate(order):
                     if wt[item] != -1:
                         new_graph.add_edge((D[u], D[Adjs[item]]))
-            print(new_graph.get_graph_dict())
-            if not isSegmentPlanar(0, 1):
-                return False
+            V_count = len(bicomponent.get_vertices())
+            
+            if V_count >= 5:
+                order = dict((v,k) for k,v in D.items())
+                if not isSegmentPlanar(0, 1):
+                    return False
+            else:
+                True
 
     return True
 
 
 def bipartity_test(minimum, A, aLefts, aRights):
-    i = aLefts.size()
+    i = len(aLefts)
     if i == 0:
-        aLefts.add(A)
-        aRights.add([])
+        aLefts.append(A)
+        aRights.append([])
         return True
 
-    aL = [] #LinkedList<Integer>
-    aR = [] #LinkedList<Integer>
-    helper = [] #LinkedList<Integer>
+    aL = []
+    aR = []
+    helper = []
 
-    aL.addAll(A)
+    aL = aL + A
     i -= 1
-    while i >= 0 and max_component_attachment(aLefts.get(i), aRights.get(i)) > minimum:
-        if not aLefts.get(i).isEmpty() and aLefts.get(i).peekLast() > minimum:
-            helper = aRights.get(i)
-            aRights.set(i, aLefts.get(i))
-            aLefts.set(i, helper)
+    while i >= 0 and max_component_attachment(aLefts[i], aRights[i]) > minimum:
+        if not (aLefts[i] == []) and aLefts[i][-1] > minimum:
+            helper = aRights[i]
+            aRights[i] = aLefts[i]
+            aLefts[i] = helper
 
-        if not aLefts.get(i).isEmpty() and aLefts.get(i).peekLast() > minimum:
+        if not (aLefts[i] == []) and aLefts[i][-1] > minimum:
             return False
 
-        aL.addAll(aLefts.removeLast())
-        aR.addAll(aRights.removeLast())
+        aL = aL + aLefts[-1]
+        del aLefts[-1]
+
+        aR = aR + aRights[-1]
+        del aRights[-1]
 
         i -= 1
 
-    aLefts.addLast(attachmentSort(aL))
-    aRights.addLast(attachmentSort(aR))
+    aLefts.append(attachmentSort(aL))
+    aRights.append(attachmentSort(aR))
+
     return True
 
 
 def max_component_attachment(aLefts, aRights):
-    resultL = -1;
-    resultR = -1;
+    resultL = -1
+    resultR = -1
 
-    if not aLefts.isEmpty():
-        resultL = aLefts.peekLast()
+    if not (aLefts == []):
+        resultL = aLefts[-1]
 
-    if not aRights.isEmpty():
-        resultR = aRights.peekLast()
+    if not (aRights == []):
+        resultR = aRights[-1]
 
     if resultR > resultL:
         return resultR
 
     return resultL
+
+
+def attachmentSort(list_):
+    if list_ == []:
+        return list_
+
+    size = max(list_)
+    tempList = []
+
+    for i in range(size + 1):
+        tempList.append(0)
+
+    while not (list_ == []):
+        to = list_[0]
+        del list_[0]
+        tempList[to] = tempList[to] + 1
+
+    for i in range(size + 1):
+        for j in range(tempList[i]):
+            list_.append(i)
+
+    return list_
 
 
 def get_disconnected_components(graph):
@@ -369,5 +413,24 @@ def get_biconnected_components(graph, ap):
 
 
 if __name__ == "__main__":
-    graph = Graph(g_5)
-    print(isPlanar(graph))
+    print(isPlanar(Graph(g_1)))
+    print(isPlanar(Graph(g_2)))
+    print(isPlanar(Graph(g_3)))
+    print(isPlanar(Graph(g_4)))
+    print(isPlanar(Graph(g_5)))
+    print(isPlanar(Graph(g_6)))
+    print(isPlanar(Graph(K_5)))
+    print(isPlanar(Graph(K_3_3)))
+
+    #alphabet = list('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789')
+    #for k in range(1, 61):
+    #    graph = {}
+    #    for i in range(k):
+    #        adj = set()
+    #        for j in range(k):
+    #            if i != j:
+    #                adj.add(alphabet[j])
+    #        graph[alphabet[i]] = adj
+    #    print("K", k, ":")
+    #    result = isPlanar(Graph(graph))
+    #    print(result)
