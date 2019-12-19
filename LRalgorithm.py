@@ -7,7 +7,7 @@ from typing import Tuple, List, Dict
 from ConflictPair import ConflictPair
 from BucketSearch import bucket_sort
 from graph import Graph
-from graphs import *
+#from graphs import *
 import datetime
 
 from Interval import Interval
@@ -276,6 +276,7 @@ class LRPlanarityCheck:
 
 
 if __name__ == '__main__':
+	'''
 	graph = Graph(g_1)
 	lrTest = LRPlanarityCheck(graph)
 	print("Simple check: ", lrTest.simple_check())
@@ -300,7 +301,7 @@ if __name__ == '__main__':
 	lrTest = LRPlanarityCheck(graph)
 	print("Simple check: ", lrTest.simple_check())
 	print("LR test: ", lrTest.run(), "\n")
-	'''
+
 	print("\nGraph by Dylan Emery (planar)")
 	graph = numpy.empty((9, 9))
 	graph.fill(0)
@@ -340,9 +341,31 @@ if __name__ == '__main__':
 	print("Simple check: ", lrTest.simple_check())
 	print("LR test: ", lrTest.run())
 	print(graph)
+	
 	'''
-
 	alphabet = list('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789')
+
+	for k in range(1, len(alphabet)*10):
+		graph = {}
+		for i in range(k):
+			id = str(alphabet[i % len(alphabet)]) * (i // len(alphabet) + 1)
+			adj = []
+			if i % len(alphabet) != 0:
+				if i % len(alphabet) != 1:
+					prev = str(alphabet[(i-1) % len(alphabet)]) * (i // len(alphabet) + 1)
+					adj.append(prev)
+				adj.append(alphabet[0])
+			graph[id] = adj
+		#print("V = ", k, ", E = ", (k-1)*2, ":")
+		lrTest = LRPlanarityCheck(Graph(graph))
+		#print("Simple check: ", lrTest.simple_check())
+		start = datetime.datetime.now()
+		result = lrTest.run()
+		stop = datetime.datetime.now()
+		#print("LR test: ", result)
+		print(stop-start)
+
+	'''
 	for k in range(1, len(alphabet)):
 		graph = {}
 		for i in range(k):
@@ -359,3 +382,4 @@ if __name__ == '__main__':
 		stop = datetime.datetime.now()
 		print("LR test: ", result)
 		print(stop-start, "\n")
+	'''
